@@ -1,5 +1,4 @@
-#import enum
-from imp import reload
+# By BitExpo3
 import socket
 import threading
 import sys
@@ -12,15 +11,16 @@ import os
 wmain = None
 wside = None
 wbar = None
-
 winy, winx = None, None
-
 state = ""
 
-HEADER = 64
-PORT = 5052
-SERVER = socket.gethostbyname(socket.gethostname()) # "127.0.0.1"
+
+# Server IP and PORT coming soon
+SERVER = socket.gethostbyname(socket.gethostname()) # SERVER IP AS STR ("127.0.0.1")
+PORT = 5052 # SERVER PORT AS INT (5000)
 ADDR = (SERVER, PORT)
+
+HEADER = 64
 FORMAT = "utf-8"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
