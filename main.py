@@ -41,7 +41,8 @@ DataDict = {
 DATA = DataDict.copy()
 
 TUI = {
-    "msg": ""
+    "msg": "",
+    "chat": []
 }
 
 class YamlManager:
@@ -127,6 +128,12 @@ def update(data):
         wbar.addstr(2,1,"Log-In to account!")
     else:
         wbar.addstr(2,1,f"Name: " + str(data["name"]) + " // Inv: " + str(data["inv_max"]))
+        amount = 0
+        for i in range(len(TUI["chat"])):
+            if amount >= winy-5:
+                break
+            wmain.addstr((winy-5)-i,1,TUI["chat"][i][0] + ": " + TUI["chat"][i][1])
+            amount += 1
     if TUI["msg"] != "":
         wbar.addstr(1,11," // " + TUI["msg"])
 
@@ -150,7 +157,7 @@ def getstring(max,title,var):
     curses.echo()
     string = wmain.getstr(max).decode().strip()
     curses.noecho()
-    return string
+    return str(string)
 
 class ProtocolClass():
    SOC = "s" # socket management
@@ -169,7 +176,6 @@ def recieve():
             return
         try:
             msg_length = client.recv(HEADER).decode(FORMAT)
-            #print(msg_length)
             if msg_length:
                 msg_length = int(msg_length)
                 msg = client.recv(msg_length).decode(FORMAT).split("\n")
@@ -191,14 +197,22 @@ def recieve():
                         else:
                             print("Client Up To Date! (v" + str(GAMEVERSION) + ")")
                 elif msg[0] == msg_types.REA:
-                    data_dict = json.loads(str(msg[2]).replace("'","\""))
-                    DATA[msg[1]] = data_dict[0]
+                    print("AAAAAA")
+                    print(msg)
+                    if msg[1].startswith("msg "):
+                        print("B")
+                        tmp = msg[1].split(" ")
+                        
+                        TUI["chat"].insert(0,[tmp[1],msg[1][len("msg " + tmp[1] + " "):]])
+                    else:
+                        data_dict = json.loads(str(msg[2]).replace("'","\""))
+                        DATA[msg[1]] = data_dict[0]
                 elif msg[0] == msg_types.ACC:
                     if len(msg) > 1:
                         if msg[1] == "0":
                             TUI["msg"] = ("Invalid email syntax!")
                         elif msg[1] == "1":
-                            TUI["msg"] = ("Email or Password incorrect!")
+                            TUI["msg"] = ("User or Password incorrect!")
                         elif msg[1] == "2":
                             TUI["msg"] = ("Logged in to account!")
                             state = "game"
@@ -218,8 +232,7 @@ def recieve():
                             TUI["msg"] = ("Logged in to account!")
                         elif msg[1] == "8":
                             TUI["msg"] = ("You must be logged in to do this!")
-                    #else:
-                        #print("[ACCOUNT] Please login to account!")
+                #update(DATA)
         except TimeoutError:
             pass
 
@@ -231,7 +244,6 @@ def send(msg):
 
     client.send(send_length)
     client.send(message)
-    #print(client.recv(2048).decode(FORMAT))
 
 def main(stdscr):
     global RUNNING
@@ -262,6 +274,7 @@ def main(stdscr):
         thread1.isDaemon = True
         thread1.start()
 
+        #send(msg_types.ACC + "\n0\n" + "admin" + "\n" + "pass")
         
         while RUNNING:
             try:
@@ -274,38 +287,40 @@ def main(stdscr):
                 send(msg_types.SOC + "\n!")
                 sys.exit()
             elif key == ord("m"):
-                msg = getstring(30,"Command","★a ✪ ✎a ♫")
+                msg = getstring(50,"Message","")
+                send(msg_types.WRI + "\nmsg " + msg)
             elif key == ord("t"): 
                 msg = getstring(50,"Command","")
                 msg = msg.lower().strip()
-                #print(msg)
 
                 if msg == "login":
-                    email = getstring(30,"Login","EMail")
+                    name = getstring(30,"Login","User")
                     password = getstring(20,"Login","Pass")
-                    send(msg_types.ACC + "\n0\n" + email + "\n" + password)
-                    #else:
-                    #    TUI["msg"] = ("!login [email] [password]")
-                        #print("[ACCOUNT] Please provide email and password!")
+                    send(msg_types.ACC + "\n0\n" + name + "\n" + password)
                 elif msg == "register":
-                    if len(msg) > 2:
-                        if msg[2].isalnum() & len(msg[2]) <= 20 & len(msg[2]) >= 5:
-                            if state == "login":
-                                send(msg_types.ACC + "\n1\n" + msg[1] + "\n" + msg[2])
-                            else:
-                                TUI["msg"] = ("You can not do this while logged in!")
+                    if state == "login":
+                        email = getstring(30,"Register","EMail")
+                        password = getstring(20,"Register","Pass")
+                        name = getstring(20,"Register","User")
+                        print(password)
+                        print(password.isalnum())
+                        print(len(password) <= 20)
+                        print(len(password) >= 5)
+
+                        if password.isalnum() and len(password) <= 20 and len(password) >= 5:
+                            send(msg_types.ACC + "\n1\n" + email + "\n" + password + "\n" + name)
                         else:
                             TUI["msg"] = ("Password must be alphanumeric, and 5 - 20 characters long!")
                     else:
-                        TUI["msg"] = ("register [email] [password]")
+                        TUI["msg"] = ("You can not do this while logged in!")
                 elif msg == "token":
-                    if len(msg) > 1:
-                        if state == "login":
-                            send(msg_types.ACC + "\n2\n" + msg[1])
-                        else:
-                            TUI["msg"] = ("You can not do this while logged in!")
+                    token = getstring(30,"Register","Token")
+                    if state == "login":
+                        send(msg_types.ACC + "\n2\n" + token)
                     else:
-                        TUI["msg"] = ("token [token]")
+                        TUI["msg"] = ("You can not do this while logged in!")
+                else:
+                    TUI["msg"] = "Unknown command."
                 #elif len(msg) > 1 and msg[0] == "r":
                 #    #print("[SENT] Retrieving data from server!")
                 #    send(msg_types.REA + "\n" + msg[1])
@@ -323,7 +338,7 @@ def main(stdscr):
                 update(DATA)
             else:
                 update(DATA)
-                if key != -1:
-                    TUI["msg"] = ""
+                #if key != -1:
+                #    TUI["msg"] = ""
 
 wrapper(main)
