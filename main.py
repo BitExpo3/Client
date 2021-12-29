@@ -1,4 +1,7 @@
-# By BitExpo3
+# /  ┌─────────────┐ \  #
+# |==│ By BitExpo3 │==| #
+# \  └─────────────┘ /  #
+
 import socket
 import threading
 import sys
@@ -14,10 +17,9 @@ wbar = None
 winy, winx = None, None
 state = ""
 
-
-# Server IP and PORT coming soon
-SERVER = socket.gethostbyname(socket.gethostname()) # SERVER IP AS STR ("127.0.0.1")
-PORT = 5052 # SERVER PORT AS INT (5000)
+# Official server IP & PORT coming soon!
+SERVER = socket.gethostbyname(socket.gethostname())     # SERVER IP:    STR ("127.0.0.1")
+PORT = 5052                                             # SERVER PORT:  INT (5000)
 ADDR = (SERVER, PORT)
 
 HEADER = 64
@@ -28,18 +30,9 @@ client.settimeout(2)
 
 RUNNING = True
 GAMEVERSION = 1
+LOADED = False
 
-DataDict = {
-    "name": "x",
-    "inv": [],
-    "inv_max": 0.0,
-    "stats": {
-        "str": 0,
-        "def": 0
-    }
-}
-DATA = DataDict.copy()
-
+DATA = {}
 TUI = {
     "msg": "",
     "chat": []
@@ -77,15 +70,6 @@ class YamlManager:
         return file.split(".")[0]
 file = YamlManager
 
-class DataClass:
-    name = "test"
-    inv = [["c",2],["b",3]]
-    inv_max = 10.0
-    stats = {
-        "str": 10,
-        "def": 1
-    }
-
 class ColorClass:
     GREEN = None
     RED = None
@@ -104,6 +88,13 @@ class ColorClass:
         self.BLUE = curses.color_pair(4)
         self.PURPLE = curses.color_pair(5)
 color = ColorClass
+
+class ProtocolClass():
+   SOC = "s" # socket management
+   ACC = "a" # account type command
+   REA = "r" # command with read nature
+   WRI = "w" # command with write nature
+msg_types = ProtocolClass
 
 def resize(stdscr):
     global wmain, wside, wbar, winy, winx
@@ -127,17 +118,17 @@ def update(data):
     if state == "login":
         wbar.addstr(2,1,"Log-In to account!")
     else:
-        wbar.addstr(2,1,f"Name: " + str(data["name"]) + " // Inv: " + str(data["inv_max"]))
-        amount = 0
-        for i in range(len(TUI["chat"])):
-            if amount >= winy-5:
-                break
-            wmain.addstr((winy-5)-i,1,TUI["chat"][i][0] + ": " + TUI["chat"][i][1])
-            amount += 1
+        if LOADED:
+            print(data)
+            wbar.addstr(2,1,f"Inv: " + str(data["weight"]))
+            amount = 0
+            for i in range(len(TUI["chat"])):
+                if amount >= winy-5:
+                    break
+                wmain.addstr((winy-5)-i,1,TUI["chat"][i][0] + ": " + TUI["chat"][i][1])
+                amount += 1
     if TUI["msg"] != "":
         wbar.addstr(1,11," // " + TUI["msg"])
-
-    
 
 
     wbar.refresh()
@@ -159,14 +150,8 @@ def getstring(max,title,var):
     curses.noecho()
     return str(string)
 
-class ProtocolClass():
-   SOC = "s" # socket management
-   ACC = "a" # account type command
-   REA = "r" # command with read nature
-   WRI = "w" # command with write nature
-msg_types = ProtocolClass
-
 def recieve():
+    global LOADED
     global RUNNING
     global DATA
     global state, substate
@@ -189,7 +174,7 @@ def recieve():
                         tmp = str(msg[1].split(" ")[1])
                         if str(tmp) != str(GAMEVERSION):
                             print("Wrong version! Server: v" + str(tmp) + " Client: v" + str(GAMEVERSION))
-                            print("- Go to: [https://github.com/test/test] for the latest release!")
+                            print("- Go to: [https://github.com/BitExpo3/Client] for the latest release!")
                             print("('\\n' to leave)")
                             RUNNING = False
                             send(msg_types.SOC + "\n!")
@@ -197,16 +182,16 @@ def recieve():
                         else:
                             print("Client Up To Date! (v" + str(GAMEVERSION) + ")")
                 elif msg[0] == msg_types.REA:
-                    print("AAAAAA")
-                    print(msg)
                     if msg[1].startswith("msg "):
-                        print("B")
                         tmp = msg[1].split(" ")
                         
                         TUI["chat"].insert(0,[tmp[1],msg[1][len("msg " + tmp[1] + " "):]])
                     else:
-                        data_dict = json.loads(str(msg[2]).replace("'","\""))
-                        DATA[msg[1]] = data_dict[0]
+                        if msg[1] == "FINAL":
+                            LOADED = True
+                        else:
+                            data_dict = json.loads(str(msg[2]).replace("'","\""))
+                            DATA[msg[1]] = data_dict[0]
                 elif msg[0] == msg_types.ACC:
                     if len(msg) > 1:
                         if msg[1] == "0":
@@ -273,8 +258,6 @@ def main(stdscr):
         thread1 = threading.Thread(target=recieve)
         thread1.isDaemon = True
         thread1.start()
-
-        #send(msg_types.ACC + "\n0\n" + "admin" + "\n" + "pass")
         
         while RUNNING:
             try:
@@ -307,10 +290,10 @@ def main(stdscr):
                         print(len(password) <= 20)
                         print(len(password) >= 5)
 
-                        if password.isalnum() and len(password) <= 20 and len(password) >= 5:
+                        if password.isalnum() and len(password) <= 20 and len(password) >= 5 & name.isalnum() & len(name) <= 20 & len(name) >= 3:
                             send(msg_types.ACC + "\n1\n" + email + "\n" + password + "\n" + name)
                         else:
-                            TUI["msg"] = ("Password must be alphanumeric, and 5 - 20 characters long!")
+                            TUI["msg"] = ("Password and User must be alphanumeric, and 5 - 20 characters long!")
                     else:
                         TUI["msg"] = ("You can not do this while logged in!")
                 elif msg == "token":
@@ -321,24 +304,9 @@ def main(stdscr):
                         TUI["msg"] = ("You can not do this while logged in!")
                 else:
                     TUI["msg"] = "Unknown command."
-                #elif len(msg) > 1 and msg[0] == "r":
-                #    #print("[SENT] Retrieving data from server!")
-                #    send(msg_types.REA + "\n" + msg[1])
-                #elif len(msg) > 1 and msg[0] == "w":
-                #    tmp2 = ""
-                #    tmp = msg
-                #    tmp.pop(0)
-                #    for i in tmp:
-                #        tmp2 = tmp2 + i + " "
-                #    send(msg_types.WRI + "\n" + tmp2)
-            
-
             if key == 546: 
                 resize(stdscr)
                 update(DATA)
             else:
                 update(DATA)
-                #if key != -1:
-                #    TUI["msg"] = ""
-
 wrapper(main)
